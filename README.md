@@ -1,4 +1,4 @@
-<p align="center"><img src="media/art/logo_400.png" width="160" alt="FarmMode Forever logo"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/paradosi/FarmMode-Forever/main/media/art/logo_400.png" width="160" alt="FarmMode Forever logo"></p>
 
 # FarmMode Forever
 
