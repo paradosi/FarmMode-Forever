@@ -30,7 +30,7 @@ It is a rewrite of [FarmMode](https://github.com/paradosi/FarmMode) for Forever'
 
 ## Installation
 
-Copy the `FarmModeForever` folder into `World of Warcraft\_forever_\Interface\AddOns\` and restart the game. A `/reload` does not pick up a newly installed addon.
+Copy the `FarmModeForever` folder into `World of Warcraft\_forever_\Interface\AddOns\` and `/reload` (or restart the game).
 
 ## Usage
 
