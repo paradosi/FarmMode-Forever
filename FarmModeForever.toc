@@ -8,5 +8,6 @@
 ## SavedVariables: FarmModeForeverDB
 ## AddonCompartmentFunc: FarmModeForever_OnCompartmentClick
 
+Theme.lua
 Core.lua
 Options.lua

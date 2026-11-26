@@ -1,143 +1,163 @@
 ---- Options — the settings panel (Esc > Options > AddOns > FarmMode Forever)
 --
--- Same dark, ElvUI-style widgets as the classic FarmMode, drawn by hand (no
--- libraries). Every control writes its setting and calls ns.Refresh(), so a
--- change shows on the minimap at once while farm mode is on.
+-- wowdb.dev's look, shared with Forever Alts and Nightclaw Ears (Theme.lua): a
+-- navy panel, Oswald capitals for labels, JetBrains Mono for numbers, gold for
+-- whatever is active. Every control writes its setting and calls ns.Refresh(),
+-- so a change shows on the minimap at once while farm mode is on.
+--
+-- Widths are fixed rather than measured: a custom font may not be loaded yet
+-- when the panel is built, and then strings measure ~0 wide.
 
 local _, ns = ...
+local T = ns.T
+local C = T.C
 
-local FONT = "Fonts\\FRIZQT__.TTF"
-local C_ACCENT = { 0.00, 0.70, 1.00 }
-local C_TRACK  = { 0.12, 0.12, 0.12 }
-local C_EDITBG = { 0.08, 0.08, 0.08 }
-local C_HOVER  = { 0.25, 0.25, 0.25 }
-
+local COL_W = 260       -- one column of controls
 local category
 local panel
 
-local function Text(parent, size, r, g, b, a)
-    local fs = parent:CreateFontString(nil, "OVERLAY")
-    fs:SetFont(FONT, size, "")
-    fs:SetTextColor(r, g, b, a or 1)
-    return fs
+local function Upper(s) return s:upper() end
+
+-- Section header: small gold capitals over a hairline
+local function Section(anchor, yOff, label, width)
+    local text = T.Text(panel, T.display, 11, C.accent)
+    text:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, yOff)
+    text:SetText(Upper(label))
+    local line = T.Line(panel, C.divider)
+    line:SetPoint("TOPLEFT", text, "BOTTOMLEFT", 0, -5)
+    line:SetWidth(width or COL_W)
+    return line
 end
 
-local function AddBorder(f)
-    local function Edge(p1, x1, y1, p2, x2, y2)
-        local t = f:CreateTexture(nil, "OVERLAY", nil, 7)
-        t:SetColorTexture(0, 0, 0, 1)
-        t:SetPoint(p1, x1, y1)
-        t:SetPoint(p2, x2, y2)
-        return t
-    end
-    Edge("TOPLEFT", -1, 1, "TOPRIGHT", 1, 1):SetHeight(1)
-    Edge("BOTTOMLEFT", -1, -1, "BOTTOMRIGHT", 1, -1):SetHeight(1)
-    Edge("TOPLEFT", -1, 1, "BOTTOMLEFT", -1, -1):SetWidth(1)
-    Edge("TOPRIGHT", 1, 1, "BOTTOMRIGHT", 1, -1):SetWidth(1)
-end
+-- Slider: LABEL on the left, the value (editable, mono) on the right, and a
+-- 3 px gold track below that fills up to the thumb. Mouse wheel steps it.
+local function MakeSlider(anchor, yOff, label, minVal, maxVal, step, wheelStep, suffix)
+    local row = CreateFrame("Frame", nil, panel)
+    row:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, yOff)
+    row:SetSize(COL_W, 38)
 
-local function Round(value, step)
-    return math.floor(value / step + 0.5) * step
-end
+    local name = T.Text(row, T.display, 11, C.secondary)
+    name:SetPoint("TOPLEFT", 0, 0)
+    name:SetText(Upper(label))
 
--- Slider: label above, thin track with min/max either side, edit box below,
--- mouse wheel. Returns a wrapper with SetValue/GetValue and an onChange field.
-local function MakeSlider(anchor, yOff, labelText, minVal, maxVal, step, wheelStep, suffix)
-    local wrap = CreateFrame("Frame", nil, panel)
-    wrap:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, yOff)
-    wrap:SetSize(270, 48)
+    local unit = T.Text(row, T.mono, 10, C.muted, "LEFT")
+    unit:SetPoint("TOPRIGHT", 0, -1)
+    unit:SetWidth(suffix and 18 or 0.01)
+    unit:SetText(suffix or "")
 
-    local label = Text(wrap, 11, unpack(C_ACCENT))
-    label:SetPoint("TOP", wrap, "TOP", 0, 0)
-    label:SetText(labelText)
+    local eb = CreateFrame("EditBox", nil, row)
+    eb:SetPoint("RIGHT", unit, "LEFT", -2, 0)
+    eb:SetSize(48, 16)
+    eb:SetFont(T.mono, 11, "")
+    eb:SetTextColor(C.primary[1], C.primary[2], C.primary[3])
+    eb:SetJustifyH("RIGHT")
+    eb:SetAutoFocus(false)
+    eb:SetTextInsets(0, 3, 0, 0)
+    local ebBg = eb:CreateTexture(nil, "BACKGROUND")
+    ebBg:SetAllPoints()
+    T.Fill(ebBg, C.raised)
+    ebBg:Hide()     -- only while typing
 
-    local s = CreateFrame("Slider", nil, wrap)
-    s:SetPoint("TOP", label, "BOTTOM", 0, -4)
-    s:SetSize(180, 6)
+    local s = CreateFrame("Slider", nil, row)
+    s:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -6)
+    s:SetSize(COL_W, 14)
     s:SetOrientation("HORIZONTAL")
     s:SetMinMaxValues(minVal, maxVal)
     s:SetValueStep(step)
     s:SetObeyStepOnDrag(true)
     s:EnableMouseWheel(true)
-    local bg = s:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(C_TRACK[1], C_TRACK[2], C_TRACK[3], 1)
-    AddBorder(s)
+
+    local track = s:CreateTexture(nil, "BACKGROUND")
+    T.Fill(track, C.track)
+    track:SetHeight(3)
+    track:SetPoint("LEFT")
+    track:SetPoint("RIGHT")
+
     s:SetThumbTexture("Interface\\Buttons\\WHITE8x8")
     local thumb = s:GetThumbTexture()
-    thumb:SetVertexColor(C_ACCENT[1], C_ACCENT[2], C_ACCENT[3], 1)
-    thumb:SetSize(10, 12)
+    thumb:SetVertexColor(C.accentHi[1], C.accentHi[2], C.accentHi[3], 1)
+    thumb:SetSize(4, 12)
 
-    local minLbl = Text(wrap, 10, 0.5, 0.5, 0.5)
-    minLbl:SetPoint("RIGHT", s, "LEFT", -6, 0)
-    minLbl:SetText(minVal)
-    local maxLbl = Text(wrap, 10, 0.5, 0.5, 0.5)
-    maxLbl:SetPoint("LEFT", s, "RIGHT", 6, 0)
-    maxLbl:SetText(maxVal)
+    local fill = s:CreateTexture(nil, "ARTWORK")
+    T.Fill(fill, C.accent)
+    fill:SetHeight(3)
+    fill:SetPoint("LEFT", track, "LEFT")
+    fill:SetPoint("RIGHT", thumb, "CENTER")     -- follows the thumb by itself
 
-    local eb = CreateFrame("EditBox", nil, wrap)
-    eb:SetPoint("TOP", s, "BOTTOM", 0, -4)
-    eb:SetSize(52, 18)
-    eb:SetFont(FONT, 11, "")
-    eb:SetAutoFocus(false)
-    eb:SetJustifyH("CENTER")
-    eb:SetTextColor(1, 1, 1)
-    local eBg = eb:CreateTexture(nil, "BACKGROUND")
-    eBg:SetAllPoints()
-    eBg:SetColorTexture(C_EDITBG[1], C_EDITBG[2], C_EDITBG[3], 1)
-    AddBorder(eb)
-
-    local unit = Text(wrap, 10, 0.5, 0.5, 0.5)
-    unit:SetPoint("LEFT", eb, "RIGHT", 4, 0)
-    unit:SetText(suffix or "")
+    local function Round(v) return math.floor(v / step + 0.5) * step end
+    local function Show(v)
+        if not eb:HasFocus() then eb:SetText(Round(v)) end
+    end
 
     local quiet = false -- SetValue from code: show it, don't write it back
-    s:SetScript("OnValueChanged", function(_, value)
-        value = Round(value, step)
-        if not eb:HasFocus() then eb:SetText(value) end
-        if not quiet and wrap.onChange then wrap.onChange(value) end
+    s:SetScript("OnValueChanged", function(_, v)
+        v = Round(v)
+        Show(v)
+        if not quiet and row.onChange then row.onChange(v) end
     end)
     s:SetScript("OnMouseWheel", function(self, delta)
         local v = self:GetValue() + delta * (wheelStep or step)
         self:SetValue(math.max(minVal, math.min(maxVal, v)))
     end)
+    s:SetScript("OnEnter", function()
+        thumb:SetVertexColor(1, 0.95, 0.82, 1)
+        name:SetTextColor(C.primary[1], C.primary[2], C.primary[3])
+    end)
+    s:SetScript("OnLeave", function()
+        thumb:SetVertexColor(C.accentHi[1], C.accentHi[2], C.accentHi[3], 1)
+        name:SetTextColor(C.secondary[1], C.secondary[2], C.secondary[3])
+    end)
+
+    eb:SetScript("OnEditFocusGained", function(self)
+        ebBg:Show()
+        self:HighlightText()
+    end)
+    eb:SetScript("OnEditFocusLost", function(self)
+        ebBg:Hide()
+        self:SetText(Round(s:GetValue()))
+    end)
     eb:SetScript("OnEnterPressed", function(self)
         local v = tonumber(self:GetText())
-        if v then
-            s:SetValue(Round(math.max(minVal, math.min(maxVal, v)), step))
-        end
-        self:SetText(Round(s:GetValue(), step))
+        if v then s:SetValue(Round(math.max(minVal, math.min(maxVal, v)))) end
         self:ClearFocus()
     end)
-    eb:SetScript("OnEscapePressed", function(self)
-        self:SetText(Round(s:GetValue(), step))
-        self:ClearFocus()
-    end)
+    eb:SetScript("OnEscapePressed", eb.ClearFocus)
 
-    function wrap:SetValue(v)
+    function row:SetValue(v)
         quiet = true
         s:SetValue(v)
-        eb:SetText(Round(v, step))
+        eb:SetText(Round(v))
         quiet = false
     end
-    return wrap
+    return row
 end
 
-local function MakeCheck(anchor, yOff, labelText)
+-- Checkbox: a hairline box that fills gold when on, label beside it. The whole
+-- row is clickable.
+local function MakeCheck(anchor, yOff, label)
     local btn = CreateFrame("Button", nil, panel)
-    btn:SetSize(16, 16)
     btn:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, yOff)
-    local bg = btn:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(C_TRACK[1], C_TRACK[2], C_TRACK[3], 1)
-    AddBorder(btn)
-    local mark = btn:CreateTexture(nil, "ARTWORK")
+    btn:SetSize(COL_W, 18)
+
+    local box = CreateFrame("Frame", nil, btn)
+    box:SetSize(14, 14)
+    box:SetPoint("LEFT")
+    local boxBg = box:CreateTexture(nil, "BACKGROUND")
+    boxBg:SetAllPoints()
+    T.Fill(boxBg, C.raised)
+    T.Border(box)
+    local mark = box:CreateTexture(nil, "ARTWORK")
     mark:SetPoint("TOPLEFT", 3, -3)
     mark:SetPoint("BOTTOMRIGHT", -3, 3)
-    mark:SetColorTexture(C_ACCENT[1], C_ACCENT[2], C_ACCENT[3], 1)
+    T.Fill(mark, C.accent)
 
-    function btn:SetChecked(val)
-        self.checked = val and true or false
+    local text = T.Text(btn, T.display, 12, C.secondary)
+    text:SetPoint("LEFT", box, "RIGHT", 9, 0)
+    text:SetText(label)
+    btn.label = text
+
+    function btn:SetChecked(v)
+        self.checked = v and true or false
         mark:SetShown(self.checked)
     end
     btn:SetChecked(false)
@@ -146,42 +166,44 @@ local function MakeCheck(anchor, yOff, labelText)
         PlaySound(SOUNDKIT.U_CHAT_SCROLL_BUTTON)
         if self.onChange then self.onChange(self.checked) end
     end)
-
-    local label = Text(panel, 11, 0.9, 0.9, 0.9)
-    label:SetPoint("LEFT", btn, "RIGHT", 8, 0)
-    label:SetText(labelText)
-    btn.label = label
+    btn:SetScript("OnEnter", function() text:SetTextColor(C.primary[1], C.primary[2], C.primary[3]) end)
+    btn:SetScript("OnLeave", function() text:SetTextColor(C.secondary[1], C.secondary[2], C.secondary[3]) end)
+    function btn:SetEnabledLook(on)
+        self:SetAlpha(on and 1 or 0.4)
+    end
     return btn
 end
 
-local function MakeButton(text, width)
-    local btn = CreateFrame("Button", nil, panel)
-    btn:SetSize(width, 22)
-    local bg = btn:CreateTexture(nil, "BACKGROUND")
+-- A bordered text button; `selected` paints it gold (the shape switch)
+local function MakeButton(label, width)
+    local b = CreateFrame("Button", nil, panel)
+    b:SetSize(width, 24)
+    local bg = b:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
-    AddBorder(btn)
-    local lbl = Text(btn, 11, 1, 1, 1)
-    lbl:SetPoint("CENTER")
-    lbl:SetText(text)
+    T.Border(b)
+    local text = T.Text(b, T.display, 11, C.muted, "CENTER")
+    text:SetPoint("CENTER")
+    text:SetText(Upper(label))
 
-    -- selected: drawn in the accent colour (used by the shape buttons)
     local function Paint(hover)
-        if btn.selected then
-            bg:SetColorTexture(C_ACCENT[1] * 0.6, C_ACCENT[2] * 0.6, C_ACCENT[3] * 0.6, 1)
-        elseif hover then
-            bg:SetColorTexture(C_HOVER[1], C_HOVER[2], C_HOVER[3], 1)
+        if b.selected then
+            T.Fill(bg, C.chip)
+            text:SetTextColor(C.accent[1], C.accent[2], C.accent[3])
         else
-            bg:SetColorTexture(C_TRACK[1], C_TRACK[2], C_TRACK[3], 1)
+            T.Fill(bg, hover and C.raised or { 0, 0, 0, 0 })
+            local c = hover and C.primary or C.muted
+            text:SetTextColor(c[1], c[2], c[3])
         end
     end
-    function btn:SetSelected(v)
-        self.selected = v
+    function b:SetSelected(on)
+        self.selected = on
         Paint(self:IsMouseOver())
     end
-    btn:SetScript("OnEnter", function() Paint(true) end)
-    btn:SetScript("OnLeave", function() Paint(false) end)
+    b:SetScript("OnEnter", function() Paint(true) end)
+    b:SetScript("OnLeave", function() Paint(false) end)
+    T.HoverGlow(b)
     Paint(false)
-    return btn
+    return b
 end
 
 function ns.CreateOptions()
@@ -190,28 +212,38 @@ function ns.CreateOptions()
     panel.name = "FarmMode Forever"
     panel:Hide()
 
-    local panelBg = panel:CreateTexture(nil, "BACKGROUND")
-    panelBg:SetAllPoints()
-    panelBg:SetColorTexture(0.05, 0.05, 0.05, 0.9)
+    local bg = panel:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    T.Fill(bg, C.bg)
 
-    -- Header
-    local icon = panel:CreateTexture(nil, "ARTWORK")
-    icon:SetSize(32, 32)
-    icon:SetPoint("TOPLEFT", 16, -12)
-    icon:SetTexture("Interface\\AddOns\\FarmModeForever\\media\\textures\\logo")
+    -- Header: logo, name, version chip, gold line
+    local logo = panel:CreateTexture(nil, "ARTWORK")
+    logo:SetSize(40, 40)
+    logo:SetPoint("TOPLEFT", 18, -16)
+    logo:SetTexture("Interface\\AddOns\\FarmModeForever\\media\\textures\\logo")
 
-    local title = Text(panel, 16, unpack(C_ACCENT))
-    title:SetPoint("LEFT", icon, "RIGHT", 8, 0)
-    title:SetText("FarmMode Forever v" .. ns.version)
+    local title = T.Text(panel, T.display, 20, C.primary)
+    title:SetPoint("TOPLEFT", logo, "TOPRIGHT", 12, -1)
+    title:SetText("FARMMODE FOREVER")
 
-    local desc = Text(panel, 11, 0.6, 0.6, 0.6)
-    desc:SetPoint("TOPLEFT", icon, "BOTTOMLEFT", 0, -8)
-    desc:SetText("The minimap as a big gathering map. Changes show at once while farm mode is on.")
+    local version = T.Chip(panel)
+    version:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -26, -24)
+    version:SetText("V" .. ns.version)
 
-    local headerLine = panel:CreateTexture(nil, "ARTWORK")
-    headerLine:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -6)
-    headerLine:SetSize(580, 1)
-    headerLine:SetColorTexture(C_ACCENT[1], C_ACCENT[2], C_ACCENT[3], 0.4)
+    local sub = T.Text(panel, T.mono, 10, C.muted)
+    sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -4)
+    sub:SetText("the minimap as a gathering map  ·  changes apply live")
+
+    T.GoldLine(panel, -70)
+
+    -- An invisible anchor at the top of each column
+    local function ColumnTop(x)
+        local f = CreateFrame("Frame", nil, panel)
+        f:SetSize(1, 1)
+        f:SetPoint("TOPLEFT", panel, "TOPLEFT", x, -80)
+        return f
+    end
+    local left, right = ColumnTop(18), ColumnTop(18 + COL_W + 40)
 
     local function Set(key)
         return function(v)
@@ -220,70 +252,65 @@ function ns.CreateOptions()
         end
     end
 
-    -- Left column: the map itself
-    local size = MakeSlider(headerLine, -14, "Size", 140, 700, 10, 20, "px")
+    -- Left column: the map and where it sits
+    local map = Section(left, 0, "Map")
+    local size = MakeSlider(map, -12, "Size", 140, 700, 10, 20, "px")
     size.onChange = Set("size")
-    local zoom = MakeSlider(size, -8, "Zoom  (0 = farthest out)", 0, 5, 1, 1)
+    local zoom = MakeSlider(size, -10, "Zoom", 0, 5, 1, 1)
     zoom.onChange = Set("zoom")
-    local opacity = MakeSlider(zoom, -8, "Opacity", 30, 100, 1, 5, "%")
+    local opacity = MakeSlider(zoom, -10, "Opacity", 30, 100, 1, 5, "%")
     opacity.onChange = Set("opacity")
-    local xOff = MakeSlider(opacity, -8, "Left / Right", -900, 900, 1, 10)
+
+    local pos = Section(opacity, -18, "Position")
+    local xOff = MakeSlider(pos, -12, "Left / Right", -900, 900, 1, 10)
     xOff.onChange = Set("x")
-    local yOff = MakeSlider(xOff, -8, "Down / Up", -600, 600, 1, 10)
+    local yOff = MakeSlider(xOff, -10, "Down / Up", -600, 600, 1, 10)
     yOff.onChange = Set("y")
 
-    -- Right column: shape and behaviour
-    local col = CreateFrame("Frame", nil, panel)
-    col:SetSize(1, 1)
-    col:SetPoint("TOPLEFT", headerLine, "BOTTOMLEFT", 310, -14)
-
-    local shapeLabel = Text(panel, 11, unpack(C_ACCENT))
-    shapeLabel:SetPoint("TOPLEFT", col, "TOPLEFT", 0, 0)
-    shapeLabel:SetText("Shape")
-
-    local roundBtn = MakeButton("Round", 90)
-    roundBtn:SetPoint("TOPLEFT", shapeLabel, "BOTTOMLEFT", 0, -6)
-    local squareBtn = MakeButton("Square", 90)
+    -- Right column: shape, behaviour, combat
+    local shape = Section(right, 0, "Shape")
+    local roundBtn = MakeButton("Round", (COL_W - 8) / 2)
+    roundBtn:SetPoint("TOPLEFT", shape, "BOTTOMLEFT", 0, -12)
+    local squareBtn = MakeButton("Square", (COL_W - 8) / 2)
     squareBtn:SetPoint("LEFT", roundBtn, "RIGHT", 8, 0)
-    local function SetShape(shape)
-        db.shape = shape
-        roundBtn:SetSelected(shape == "ROUND")
-        squareBtn:SetSelected(shape == "SQUARE")
+    local function SetShape(v)
+        db.shape = v
+        roundBtn:SetSelected(v == "ROUND")
+        squareBtn:SetSelected(v == "SQUARE")
+        PlaySound(SOUNDKIT.U_CHAT_SCROLL_BUTTON)
         ns.Refresh()
     end
     roundBtn:SetScript("OnClick", function() SetShape("ROUND") end)
     squareBtn:SetScript("OnClick", function() SetShape("SQUARE") end)
-
-    local border = MakeCheck(roundBtn, -14, "Show the border")
+    local border = MakeCheck(roundBtn, -12, "Show the border")
     border.onChange = Set("border")
-    local drag = MakeCheck(border, -10, "Drag the map to move it")
+
+    local behaviour = Section(border, -18, "Behaviour")
+    local drag = MakeCheck(behaviour, -10, "Drag the map to move it")
     drag.onChange = Set("draggable")
-    local buttons = MakeCheck(drag, -10, "Hide minimap buttons")
+    local buttons = MakeCheck(drag, -6, "Hide minimap buttons")
     buttons.onChange = Set("hideButtons")
 
-    local combatLabel = Text(panel, 11, unpack(C_ACCENT))
-    combatLabel:SetPoint("TOPLEFT", buttons, "BOTTOMLEFT", 0, -18)
-    combatLabel:SetText("Combat")
-    local combatClose = MakeCheck(combatLabel, -8, "Close farm mode when combat starts")
-    local combatReopen = MakeCheck(combatClose, -10, "Open it again when combat ends")
+    local combat = Section(buttons, -18, "Combat")
+    local combatClose = MakeCheck(combat, -10, "Close farm mode when combat starts")
+    local combatReopen = MakeCheck(combatClose, -6, "Open it again when combat ends")
     combatClose.onChange = function(v)
         db.combatClose = v
-        combatReopen.label:SetAlpha(v and 1 or 0.4)
+        combatReopen:SetEnabledLook(v)
     end
     combatReopen.onChange = function(v) db.combatReopen = v end
 
     -- Footer
-    local sep = panel:CreateTexture(nil, "ARTWORK")
-    sep:SetPoint("TOPLEFT", yOff, "BOTTOMLEFT", 0, -12)
-    sep:SetSize(580, 1)
-    sep:SetColorTexture(0.2, 0.2, 0.2, 1)
+    local foot = T.Line(panel, C.divider)
+    foot:SetPoint("TOPLEFT", yOff, "BOTTOMLEFT", 0, -16)
+    foot:SetWidth(COL_W * 2 + 40)
 
-    local reset = MakeButton("Reset Defaults", 110)
-    reset:SetPoint("TOPLEFT", sep, "BOTTOMLEFT", 0, -10)
+    local reset = MakeButton("Reset defaults", 130)
+    reset:SetPoint("TOPLEFT", foot, "BOTTOMLEFT", 0, -12)
 
-    local hint = Text(panel, 10, 0.4, 0.4, 0.4)
-    hint:SetPoint("TOPLEFT", reset, "BOTTOMLEFT", 0, -12)
-    hint:SetText("/farm toggles  |  Key Bindings > FarmMode Forever  |  Addon menu: left-click toggles, right-click opens this")
+    local hint = T.Text(panel, T.mono, 10, C.muted)
+    hint:SetPoint("LEFT", reset, "RIGHT", 16, 0)
+    hint:SetText("/farm toggles  ·  right-click the addon menu entry for this")
 
     local function Sync()
         size:SetValue(db.size)
@@ -298,7 +325,7 @@ function ns.CreateOptions()
         buttons:SetChecked(db.hideButtons)
         combatClose:SetChecked(db.combatClose)
         combatReopen:SetChecked(db.combatReopen)
-        combatReopen.label:SetAlpha(db.combatClose and 1 or 0.4)
+        combatReopen:SetEnabledLook(db.combatClose)
     end
     panel:SetScript("OnShow", Sync)
     ns.OnSettingsChanged = function()

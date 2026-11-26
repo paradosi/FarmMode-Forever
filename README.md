@@ -72,7 +72,7 @@ All settings are per account (`FarmModeForeverDB`) and take effect immediately w
 
 ## How it works
 
-The work is in `Core.lua`. `Options.lua` only draws the settings panel.
+The work is in `Core.lua`. `Options.lua` only draws the settings panel, in the wowdb.dev look shared with Forever Alts and Nightclaw Ears (`Theme.lua`).
 
 1. **Snapshot.** Before changing anything, farm mode records the minimap's anchors, size, opacity and zoom. It also records the size and visibility of Blizzard's border art (`MinimapBackdrop`, `MinimapCompassTexture`, `MinimapCompassTextureUnderlay`) and the anchors of the zoom buttons.
 2. **Look.** The minimap is resized with `SetSize`. The border art is a child of the minimap that was drawn for a 198 px map, so it is scaled by the same factor (`size / 198`), and so are the zoom buttons' offsets. *Square* swaps the mask for a plain white texture, hides Blizzard's ring and shows a frame of four textures. The zoom is then stepped away and back, which is what makes the minimap redraw after a resize or a mask change.
@@ -116,7 +116,9 @@ There is no build step. From `~/projects/wowaddons`:
 |---|---|
 | `FarmModeForever.toc` | Forever TOC (16001) |
 | `Core.lua` | Snapshot, look, position, drag, buttons, combat, slash command |
-| `Options.lua` | The settings panel |
+| `Theme.lua` | wowdb.dev's look (colours, fonts, borders, hover glow), copied from Forever Alts and trimmed |
+| `Options.lua` | The settings panel, built on `Theme.lua` |
+| `media/fonts/` | Oswald and JetBrains Mono (SIL OFL; the licence files ship with them) |
 | `Bindings.xml` | The key binding (loaded by the client, not listed in the TOC) |
 | `media/textures/logo.tga` | Icon, shipped |
 | `media/art/logo.svg` | Logo source. Render with `rsvg-convert -w 400` / `-w 64`; the TGA comes from the 64 px PNG via Pillow (`uv run --with pillow`) |
@@ -124,4 +126,4 @@ There is no build step. From `~/projects/wowaddons`:
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). The fonts in `media/fonts` are under the SIL Open Font License (`OFL-*.txt` beside them).

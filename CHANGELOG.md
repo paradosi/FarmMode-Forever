@@ -8,3 +8,4 @@
 - Closes farm mode when combat starts and opens it again when combat ends (both optional); a toggle pressed during combat waits for it to end
 - Hiding minimap buttons also hides other addons' minimap buttons
 - Addon compartment entry: left-click toggles, right-click opens the options
+- Settings window in the wowdb.dev look (navy, gold, Oswald and JetBrains Mono), matching Forever Alts and Nightclaw Ears
