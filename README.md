@@ -1,3 +1,5 @@
+<p align="center"><img src="media/art/logo_400.png" width="160" alt="FarmMode Forever logo"></p>
+
 # FarmMode Forever
 
 Turns the minimap into a big gathering map in the middle of your screen, and puts it back exactly as it was when you are done. Written for **WoW Forever** only.
@@ -117,7 +119,8 @@ There is no build step. From `~/projects/wowaddons`:
 | `Options.lua` | The settings panel |
 | `Bindings.xml` | The key binding (loaded by the client, not listed in the TOC) |
 | `media/textures/logo.tga` | Icon, shipped |
-| `media/art/` | Logo sources, not shipped |
+| `media/art/logo.svg` | Logo source. Render with `rsvg-convert -w 400` / `-w 64`; the TGA comes from the 64 px PNG via Pillow (`uv run --with pillow`) |
+| `media/art/*.png` | Rendered logo for the README, not shipped |
 
 ## License
 
