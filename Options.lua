@@ -15,15 +15,16 @@ local C = T.C
 local COL_W = 260       -- one column of controls
 local category
 local panel
+local host     -- the scrolling content frame the widgets are made in
 
 local function Upper(s) return s:upper() end
 
 -- Section header: small gold capitals over a hairline
 local function Section(anchor, yOff, label, width)
-    local text = T.Text(panel, T.display, 11, C.accent)
+    local text = T.Text(host, T.display, 11, C.accent)
     text:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, yOff)
     text:SetText(Upper(label))
-    local line = T.Line(panel, C.divider)
+    local line = T.Line(host, C.divider)
     line:SetPoint("TOPLEFT", text, "BOTTOMLEFT", 0, -5)
     line:SetWidth(width or COL_W)
     return line
@@ -32,7 +33,7 @@ end
 -- Slider: LABEL on the left, the value (editable, mono) on the right, and a
 -- 3 px gold track below that fills up to the thumb. Mouse wheel steps it.
 local function MakeSlider(anchor, yOff, label, minVal, maxVal, step, wheelStep, suffix)
-    local row = CreateFrame("Frame", nil, panel)
+    local row = CreateFrame("Frame", nil, host)
     row:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, yOff)
     row:SetSize(COL_W, 38)
 
@@ -123,6 +124,10 @@ local function MakeSlider(anchor, yOff, label, minVal, maxVal, step, wheelStep, 
     end)
     eb:SetScript("OnEscapePressed", eb.ClearFocus)
 
+    function row:SetEnabledLook(on)
+        self:SetAlpha(on and 1 or 0.4)
+    end
+
     function row:SetValue(v)
         quiet = true
         s:SetValue(v)
@@ -135,7 +140,7 @@ end
 -- Checkbox: a hairline box that fills gold when on, label beside it. The whole
 -- row is clickable.
 local function MakeCheck(anchor, yOff, label)
-    local btn = CreateFrame("Button", nil, panel)
+    local btn = CreateFrame("Button", nil, host)
     btn:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, yOff)
     btn:SetSize(COL_W, 18)
 
@@ -176,7 +181,7 @@ end
 
 -- A bordered text button; `selected` paints it gold (the shape switch)
 local function MakeButton(label, width)
-    local b = CreateFrame("Button", nil, panel)
+    local b = CreateFrame("Button", nil, host)
     b:SetSize(width, 24)
     local bg = b:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
@@ -206,6 +211,40 @@ local function MakeButton(label, width)
     return b
 end
 
+-- A row of buttons, one of them chosen: { {value, label}, ... }
+local function MakeSegment(anchor, yOff, choices, onSelect)
+    local seg = { buttons = {} }
+    local w = (COL_W - 8 * (#choices - 1)) / #choices
+    for i, c in ipairs(choices) do
+        local b = MakeButton(c[2], w)
+        if i == 1 then
+            b:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, yOff)
+        else
+            b:SetPoint("LEFT", seg.buttons[i - 1], "RIGHT", 8, 0)
+        end
+        b:SetScript("OnClick", function()
+            seg:Set(c[1])
+            PlaySound(SOUNDKIT.U_CHAT_SCROLL_BUTTON)
+            onSelect(c[1])
+        end)
+        b.value = c[1]
+        seg.buttons[i] = b
+    end
+    function seg:Set(value)
+        for _, b in ipairs(self.buttons) do b:SetSelected(b.value == value) end
+    end
+    seg.first = seg.buttons[1]
+    return seg
+end
+
+-- A muted line of explanation under a control
+local function Note(anchor, yOff, text)
+    local fs = T.Text(host, T.mono, 9, C.muted)
+    fs:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, yOff)
+    fs:SetText(text)
+    return fs
+end
+
 function ns.CreateOptions()
     local db = ns.db
     panel = CreateFrame("Frame", "FarmModeForeverOptions", UIParent)
@@ -216,7 +255,8 @@ function ns.CreateOptions()
     bg:SetAllPoints()
     T.Fill(bg, C.bg)
 
-    -- Header: logo, name, version chip, gold line
+    ---- Header (fixed): logo, name, version chip, gold line
+
     local logo = panel:CreateTexture(nil, "ARTWORK")
     logo:SetSize(40, 40)
     logo:SetPoint("TOPLEFT", 18, -16)
@@ -236,11 +276,58 @@ function ns.CreateOptions()
 
     T.GoldLine(panel, -70)
 
-    -- An invisible anchor at the top of each column
+    ---- Scrolling body
+    --
+    -- Blizzard's options window leaves an addon about 650 x 600; this panel is
+    -- taller. The mouse wheel scrolls it (over a slider it moves the slider),
+    -- and a thin gold bar on the right shows where you are.
+
+    local scroll = CreateFrame("ScrollFrame", nil, panel)
+    scroll:SetPoint("TOPLEFT", 0, -72)
+    scroll:SetPoint("BOTTOMRIGHT", -12, 4)
+    host = CreateFrame("Frame", nil, scroll)
+    host:SetSize(COL_W * 2 + 80, 700)
+    scroll:SetScrollChild(host)
+
+    local barTrack = panel:CreateTexture(nil, "ARTWORK")
+    T.Fill(barTrack, C.divider)
+    barTrack:SetWidth(2)
+    barTrack:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -6, -80)
+    barTrack:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -6, 10)
+    local barThumb = panel:CreateTexture(nil, "OVERLAY")
+    T.Fill(barThumb, C.accent)
+    barThumb:SetWidth(2)
+
+    local function UpdateBar()
+        local range = scroll:GetVerticalScrollRange()
+        local shown = range > 1
+        barTrack:SetShown(shown)
+        barThumb:SetShown(shown)
+        if not shown then return end
+        local trackH = barTrack:GetHeight()
+        local view = scroll:GetHeight()
+        local thumbH = math.max(24, trackH * view / (view + range))
+        barThumb:SetHeight(thumbH)
+        local y = (trackH - thumbH) * scroll:GetVerticalScroll() / range
+        barThumb:ClearAllPoints()
+        barThumb:SetPoint("TOP", barTrack, "TOP", 0, -y)
+    end
+    scroll:EnableMouseWheel(true)
+    scroll:SetScript("OnMouseWheel", function(self, delta)
+        local range = self:GetVerticalScrollRange()
+        self:SetVerticalScroll(math.max(0, math.min(range, self:GetVerticalScroll() - delta * 40)))
+        UpdateBar()
+    end)
+    scroll:SetScript("OnScrollRangeChanged", UpdateBar)
+    scroll:SetScript("OnSizeChanged", function(self, w)
+        host:SetWidth(math.max(w, COL_W * 2 + 80))
+        UpdateBar()
+    end)
+
     local function ColumnTop(x)
-        local f = CreateFrame("Frame", nil, panel)
+        local f = CreateFrame("Frame", nil, host)
         f:SetSize(1, 1)
-        f:SetPoint("TOPLEFT", panel, "TOPLEFT", x, -80)
+        f:SetPoint("TOPLEFT", host, "TOPLEFT", x, -8)
         return f
     end
     local left, right = ColumnTop(18), ColumnTop(18 + COL_W + 40)
@@ -252,7 +339,8 @@ function ns.CreateOptions()
         end
     end
 
-    -- Left column: the map and where it sits
+    ---- Left column: the map, where it sits, when it turns on by itself
+
     local map = Section(left, 0, "Map")
     local size = MakeSlider(map, -12, "Size", 140, 700, 10, 20, "px")
     size.onChange = Set("size")
@@ -267,48 +355,75 @@ function ns.CreateOptions()
     local yOff = MakeSlider(xOff, -10, "Down / Up", -600, 600, 1, 10)
     yOff.onChange = Set("y")
 
-    -- Right column: shape, behaviour, combat
-    local shape = Section(right, 0, "Shape")
-    local roundBtn = MakeButton("Round", (COL_W - 8) / 2)
-    roundBtn:SetPoint("TOPLEFT", shape, "BOTTOMLEFT", 0, -12)
-    local squareBtn = MakeButton("Square", (COL_W - 8) / 2)
-    squareBtn:SetPoint("LEFT", roundBtn, "RIGHT", 8, 0)
-    local function SetShape(v)
-        db.shape = v
-        roundBtn:SetSelected(v == "ROUND")
-        squareBtn:SetSelected(v == "SQUARE")
-        PlaySound(SOUNDKIT.U_CHAT_SCROLL_BUTTON)
-        ns.Refresh()
-    end
-    roundBtn:SetScript("OnClick", function() SetShape("ROUND") end)
-    squareBtn:SetScript("OnClick", function() SetShape("SQUARE") end)
-    local border = MakeCheck(roundBtn, -12, "Show the border")
+    local auto = Section(yOff, -18, "Automatic")
+    local remember = MakeCheck(auto, -10, "Remember it across reloads and logins")
+    remember.onChange = Set("remember")
+    local autoMount = MakeCheck(remember, -6, "Turn on when you mount up")
+    autoMount.onChange = Set("autoMount")
+    local offInstance = MakeCheck(autoMount, -6, "Hide in dungeons and battlegrounds")
+    offInstance.onChange = Set("offInstance")
+    local offResting = MakeCheck(offInstance, -6, "Hide in cities and inns")
+    offResting.onChange = Set("offResting")
+    Note(offResting, -6, "/farm still opens it there, until you leave")
+
+    ---- Right column: shape, the map's behaviour, combat, tracking
+
+    local shapeSec = Section(right, 0, "Shape")
+    local shape = MakeSegment(shapeSec, -12, { { "ROUND", "Round" }, { "SQUARE", "Square" } }, Set("shape"))
+    local border = MakeCheck(shape.first, -12, "Show the border")
     border.onChange = Set("border")
 
-    local behaviour = Section(border, -18, "Behaviour")
-    local drag = MakeCheck(behaviour, -10, "Drag the map to move it")
+    local onMap = Section(border, -18, "On the map")
+    local drag = MakeCheck(onMap, -10, "Drag the map to move it")
     drag.onChange = Set("draggable")
-    local buttons = MakeCheck(drag, -6, "Hide minimap buttons")
+    local through = MakeCheck(drag, -6, "Clicks go through (hold Alt to use it)")
+    through.onChange = Set("clickThrough")
+    local buttons = MakeCheck(through, -6, "Hide minimap buttons")
     buttons.onChange = Set("hideButtons")
+    local coords = MakeCheck(buttons, -6, "Show coordinates")
+    coords.onChange = Set("coords")
+    local rotate = MakeCheck(coords, -6, "Rotate the map as you turn")
+    rotate.onChange = Set("rotate")
 
-    local combat = Section(buttons, -18, "Combat")
-    local combatClose = MakeCheck(combat, -10, "Close farm mode when combat starts")
-    local combatReopen = MakeCheck(combatClose, -6, "Open it again when combat ends")
-    combatClose.onChange = function(v)
-        db.combatClose = v
-        combatReopen:SetEnabledLook(v)
+    local combatSec = Section(rotate, -18, "In combat")
+    local reopen, combatAlpha
+    local function CombatLooks(mode)
+        reopen:SetEnabledLook(mode == "CLOSE")
+        combatAlpha:SetEnabledLook(mode == "FADE")
     end
-    combatReopen.onChange = function(v) db.combatReopen = v end
+    local combat = MakeSegment(combatSec, -12, { { "CLOSE", "Close" }, { "FADE", "Fade" }, { "STAY", "Stay" } },
+        function(v)
+            db.combatMode = v
+            CombatLooks(v)
+            ns.Refresh()
+        end)
+    reopen = MakeCheck(combat.first, -12, "Open it again when combat ends")
+    reopen.onChange = Set("combatReopen")
+    combatAlpha = MakeSlider(reopen, -10, "Opacity in combat", 0, 80, 5, 5, "%")
+    combatAlpha.onChange = Set("combatOpacity")
 
-    -- Footer
-    local foot = T.Line(panel, C.divider)
-    foot:SetPoint("TOPLEFT", yOff, "BOTTOMLEFT", 0, -16)
+    local trackSec = Section(combatAlpha, -18, "Tracking")
+    local swap = MakeCheck(trackSec, -10, "Alternate herb and ore tracking")
+    local interval = MakeSlider(swap, -10, "Every", 3, 15, 1, 1, "s")
+    swap.onChange = function(v)
+        db.swapTracking = v
+        interval:SetEnabledLook(v)
+        ns.Refresh()
+    end
+    interval.onChange = Set("swapInterval")
+    local swapNote = Note(interval, -4, "needs Herbalism and Mining; waits while you cast or fight")
+
+    ---- Footer, under the taller (right) column
+
+    local foot = T.Line(host, C.divider)
+    foot:SetPoint("TOP", swapNote, "BOTTOM", 0, -16)
+    foot:SetPoint("LEFT", host, "LEFT", 18, 0)
     foot:SetWidth(COL_W * 2 + 40)
 
     local reset = MakeButton("Reset defaults", 130)
     reset:SetPoint("TOPLEFT", foot, "BOTTOMLEFT", 0, -12)
 
-    local hint = T.Text(panel, T.mono, 10, C.muted)
+    local hint = T.Text(host, T.mono, 10, C.muted)
     hint:SetPoint("LEFT", reset, "RIGHT", 16, 0)
     hint:SetText("/farm toggles  ·  right-click the addon menu entry for this")
 
@@ -318,16 +433,32 @@ function ns.CreateOptions()
         opacity:SetValue(db.opacity)
         xOff:SetValue(db.x)
         yOff:SetValue(db.y)
-        roundBtn:SetSelected(db.shape == "ROUND")
-        squareBtn:SetSelected(db.shape == "SQUARE")
+        remember:SetChecked(db.remember)
+        autoMount:SetChecked(db.autoMount)
+        offInstance:SetChecked(db.offInstance)
+        offResting:SetChecked(db.offResting)
+        shape:Set(db.shape)
         border:SetChecked(db.border)
         drag:SetChecked(db.draggable)
+        through:SetChecked(db.clickThrough)
         buttons:SetChecked(db.hideButtons)
-        combatClose:SetChecked(db.combatClose)
-        combatReopen:SetChecked(db.combatReopen)
-        combatReopen:SetEnabledLook(db.combatClose)
+        coords:SetChecked(db.coords)
+        rotate:SetChecked(db.rotate)
+        combat:Set(db.combatMode)
+        reopen:SetChecked(db.combatReopen)
+        combatAlpha:SetValue(db.combatOpacity)
+        CombatLooks(db.combatMode)
+        swap:SetChecked(db.swapTracking)
+        interval:SetValue(db.swapInterval)
+        interval:SetEnabledLook(db.swapTracking)
     end
-    panel:SetScript("OnShow", Sync)
+    panel:SetScript("OnShow", function()
+        Sync()
+        -- Size the scroll area to what is actually there (fonts are loaded by now).
+        local top, bottom = host:GetTop(), reset:GetBottom()
+        if top and bottom then host:SetHeight(top - bottom + 20) end
+        UpdateBar()
+    end)
     ns.OnSettingsChanged = function()
         if panel:IsShown() then Sync() end
     end

@@ -11,3 +11,4 @@ ignore:
   - .gitignore
   - media/art
   - media/screenshots
+  - tests

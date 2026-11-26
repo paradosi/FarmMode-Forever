@@ -2,15 +2,22 @@
 --
 -- Written for WoW Forever only (16001, Retail 12's minimap). The classic
 -- FarmMode runs on four clients and scales the minimap; this one RESIZES it, so
--- the map shows more ground while node and quest icons stay their normal size,
--- and adds a square shape, a border toggle and closing during combat.
+-- the map shows more ground while node and quest icons stay their normal size.
+--
+-- Two states, kept apart on purpose:
+--   wanted   the player's intent: /farm, the key binding, mounting up (if
+--            that option is on), and remembered across /reload and login
+--   farming  whether the big map is on screen right now
+-- Reconcile() makes `farming` follow `wanted` unless something blocks it:
+-- combat (in "Close" mode), a dungeon, or a city or inn. So a fight or a
+-- capital puts the minimap back, and it returns by itself afterwards.
 --
 -- Everything farm mode changes is snapshotted first and put back exactly when
 -- it switches off. Blizzard's minimap art lives in MinimapBackdrop (a child of
 -- Minimap, so it moves with it) and is sized for a 198 px map, so a resize
 -- scales the border art by the same factor. Its mask and border are set by
 -- MinimapCluster:UpdateMinimapConfig() (Blizzard_Minimap/Camelot/Minimap.lua),
--- which runs again when the "rotate minimap" option changes; a hook re-applies
+-- which runs again when the "rotate minimap" CVar changes; a hook re-applies
 -- farm mode's look after it.
 
 local addonName, ns = ...
@@ -33,30 +40,56 @@ local BUTTONS = {
     "MinimapBackdrop.ExternalEventURLButton",
 }
 
+-- Tracking spells as Blizzard's tracking menu lists them (Minimap.lua's
+-- TRACKING_SPELL_OVERRIDE_ATLAS): ranks 1 and 2 of each.
+local HERB_SPELLS = { [2383] = true, [8387] = true }
+local ORE_SPELLS = { [2580] = true, [8388] = true }
+
 ns.defaults = {
-    size = 400,         -- the minimap's own width and height, in pixels
-    shape = "ROUND",    -- "ROUND" or "SQUARE"
+    -- the map
+    size = 400,             -- the minimap's own width and height, in pixels
+    shape = "ROUND",        -- "ROUND" or "SQUARE"
     zoom = 0,
-    opacity = 100,      -- percent
+    opacity = 100,          -- percent
     border = true,
-    x = 0,              -- centre offset from the screen centre, UIParent units
+    x = 0,                  -- centre offset from the screen centre, UIParent units
     y = 150,
+    -- behaviour
     draggable = true,
     hideButtons = false,
-    combatClose = true,     -- put the minimap back when combat starts
-    combatReopen = true,    -- and bring farm mode back when it ends
+    clickThrough = true,    -- clicks reach the world; hold Alt to use the map
+    coords = true,          -- x, y under the map
+    rotate = false,         -- turn on Blizzard's Rotate Minimap while farming
+    -- combat
+    combatMode = "CLOSE",   -- "CLOSE", "FADE" or "STAY"
+    combatReopen = true,    -- Close: bring farm mode back when combat ends
+    combatOpacity = 20,     -- Fade: percent
+    -- automatic
+    remember = true,        -- farm mode comes back after /reload and login
+    autoMount = false,      -- mounting up turns it on
+    offInstance = true,     -- hidden in dungeons, raids, battlegrounds
+    offResting = false,     -- hidden in cities and inns
+    -- tracking
+    swapTracking = false,   -- alternate Find Herbs and Find Minerals
+    swapInterval = 5,       -- seconds
 }
 
 local db
-local farming = false
+local farming = false       -- the big map is on screen
+local wanted = false        -- the player wants farm mode (see the top)
+local forced = false        -- turned on by hand inside a city or dungeon: ignore that block
+local inCombat = false
+local faded = false         -- Fade mode: the map is at combat opacity
 local snapshot              -- the minimap as it was before farm mode
 local maskChanged = false   -- farm mode set the square mask
 local hidden = {}           -- frames farm mode hid; only these are shown again
 local savedDrag             -- Minimap's own drag scripts, put back by DisableDrag
-local squareBorder
-local closedByCombat = false
-local wantAfterCombat       -- nil, or the state the player asked for during combat
+local savedRotate           -- the rotateMinimap CVar before farm mode changed it
+local squareBorder, coordFrame
+local coordTicker, swapTicker
 local applying = false      -- guards the UpdateMinimapConfig hook
+local wasMounted = false
+local lastPlace             -- "instance|resting", to notice moving in or out of one
 
 BINDING_HEADER_FARMMODEFOREVER = "FarmMode Forever"
 BINDING_NAME_FARMMODEFOREVER_TOGGLE = "Toggle Farm Mode"
@@ -80,13 +113,16 @@ end
 local function InitDB()
     FarmModeForeverDB = FarmModeForeverDB or {}
     db = FarmModeForeverDB
+    -- 0.1.0 before its release had a combatClose switch
+    if db.combatClose == false and db.combatMode == nil then db.combatMode = "STAY" end
+    db.combatClose = nil
     for k, v in pairs(ns.defaults) do
         if db[k] == nil then db[k] = v end
     end
     ns.db = db
 end
 
----- Snapshot and restore
+---- Snapshot
 
 local function TakeSnapshot()
     local s = { points = {}, zoomPoints = {} }
@@ -96,6 +132,9 @@ local function TakeSnapshot()
     s.width, s.height = Minimap:GetSize()
     s.alpha = Minimap:GetAlpha()
     s.zoom = Minimap:GetZoom()
+    s.mouse = Minimap:IsMouseEnabled()
+    s.wheel = Minimap:IsMouseWheelEnabled()
+    s.zoomHitMouse = Minimap.ZoomHitArea and Minimap.ZoomHitArea:IsMouseEnabled()
     s.backdropW, s.backdropH = MinimapBackdrop:GetSize()
     s.compassW, s.compassH = MinimapCompassTexture:GetSize()
     s.compassShown = MinimapCompassTexture:IsShown()
@@ -158,6 +197,10 @@ local function ScaleZoomButtons(k)
     end
 end
 
+local function MapAlpha()
+    return (faded and db.combatOpacity or db.opacity) / 100
+end
+
 local function ApplyLook()
     applying = true
     local k = db.size / snapshot.width
@@ -183,7 +226,7 @@ local function ApplyLook()
         if squareBorder then squareBorder:Hide() end
     end
 
-    Minimap:SetAlpha(db.opacity / 100)
+    Minimap:SetAlpha(MapAlpha())
     SetZoom(db.zoom)
     applying = false
 end
@@ -205,6 +248,19 @@ local function RestoreLook()
     Minimap:SetAlpha(snapshot.alpha)
     SetZoom(snapshot.zoom)
     applying = false
+end
+
+-- Rotate Minimap is a CVar Blizzard's look follows (the hook above re-applies
+-- ours). Farm mode turns it on and puts the old value back, at logout too.
+local function ApplyRotate()
+    local want = farming and db.rotate
+    if want and not savedRotate then
+        savedRotate = GetCVar("rotateMinimap")
+        if savedRotate == "1" then savedRotate = nil else SetCVar("rotateMinimap", "1") end
+    elseif not want and savedRotate then
+        SetCVar("rotateMinimap", savedRotate)
+        savedRotate = nil
+    end
 end
 
 ---- Position
@@ -232,6 +288,8 @@ end
 local mover = CreateFrame("Frame")
 mover:Hide()
 local grabX, grabY
+local OnDragStop
+local ApplyMouse    -- defined under Click-through; a drag ending updates it
 
 local function CursorInUI()
     local cx, cy = GetCursorPosition()
@@ -240,6 +298,8 @@ local function CursorInUI()
 end
 
 mover:SetScript("OnUpdate", function()
+    -- With click-through, letting go of Alt mid-drag can swallow OnDragStop.
+    if not IsMouseButtonDown("LeftButton") then OnDragStop() return end
     local cx, cy = CursorInUI()
     db.x, db.y = cx - grabX, cy - grabY
     Place()
@@ -251,13 +311,13 @@ local function OnDragStart()
     mover:Show()
 end
 
-local function OnDragStop()
+OnDragStop = function()
     if not mover:IsShown() then return end
     mover:Hide()
     db.x, db.y = math.floor(db.x + 0.5), math.floor(db.y + 0.5)
     Place()
+    ApplyMouse()
     if ns.OnSettingsChanged then ns.OnSettingsChanged() end
-    Print(("Position saved (%d, %d)."):format(db.x, db.y))
 end
 
 local function EnableDrag()
@@ -278,6 +338,25 @@ local function DisableDrag()
     Minimap:SetScript("OnDragStart", savedDrag.OnDragStart)
     Minimap:SetScript("OnDragStop", savedDrag.OnDragStop)
     savedDrag = nil
+end
+
+---- Click-through
+--
+-- A 400 px map in the middle of the screen catches clicks meant for the world
+-- (a herb, a mob). With this on it takes the mouse only while Alt is held.
+
+ApplyMouse = function()
+    local on
+    if farming and db.clickThrough then
+        on = IsAltKeyDown() or mover:IsShown()
+        Minimap:EnableMouse(on)
+        Minimap:EnableMouseWheel(on)
+        if Minimap.ZoomHitArea then Minimap.ZoomHitArea:EnableMouse(on) end
+    elseif snapshot then
+        Minimap:EnableMouse(snapshot.mouse)
+        Minimap:EnableMouseWheel(snapshot.wheel)
+        if Minimap.ZoomHitArea then Minimap.ZoomHitArea:EnableMouse(snapshot.zoomHitMouse) end
+    end
 end
 
 ---- Minimap buttons
@@ -310,54 +389,170 @@ local function ShowButtons()
     wipe(hidden)
 end
 
----- On and off
+---- Coordinates
 
-local function FarmOn(quiet)
-    if farming then return end
+local function UpdateCoords()
+    local text = coordFrame.text
+    local map = C_Map.GetBestMapForUnit("player")
+    local pos = map and C_Map.GetPlayerMapPosition(map, "player")
+    if not pos then text:SetText("") return end    -- instances have no map position
+    local x, y = pos:GetXY()
+    if not (canaccessvalue(x) and canaccessvalue(y)) or (x == 0 and y == 0) then
+        text:SetText("")
+        return
+    end
+    text:SetFormattedText("%.1f, %.1f", x * 100, y * 100)
+end
+
+local function ApplyCoords()
+    local on = farming and db.coords
+    if on and not coordFrame then
+        coordFrame = CreateFrame("Frame", nil, Minimap)
+        coordFrame:SetSize(120, 16)
+        coordFrame:SetPoint("TOP", Minimap, "BOTTOM", 0, -6)
+        coordFrame:SetFrameLevel(Minimap:GetFrameLevel() + 6)
+        coordFrame.text = coordFrame:CreateFontString(nil, "OVERLAY")
+        coordFrame.text:SetFont(ns.T.mono, 12, "OUTLINE")
+        coordFrame.text:SetTextColor(ns.T.C.primary[1], ns.T.C.primary[2], ns.T.C.primary[3])
+        coordFrame.text:SetPoint("CENTER")
+    end
+    if coordFrame then coordFrame:SetShown(on) end
+    if on and not coordTicker then
+        UpdateCoords()
+        coordTicker = C_Timer.NewTicker(0.2, UpdateCoords)
+    elseif not on and coordTicker then
+        coordTicker:Cancel()
+        coordTicker = nil
+    end
+end
+
+---- Tracking swap
+--
+-- Vanilla tracks one resource at a time. Turning one tracking on switches the
+-- other off, the way Blizzard's tracking menu does (C_Minimap.SetTracking). It
+-- is a spell cast, so it waits while you cast, fight, ride a taxi or are dead.
+
+local function TrackingIndexes()
+    local herb, ore, herbOn
+    for i = 1, C_Minimap.GetNumTrackingTypes() do
+        local info = C_Minimap.GetTrackingInfo(i)
+        local id = info and info.spellID
+        if id and HERB_SPELLS[id] then herb, herbOn = i, info.active
+        elseif id and ORE_SPELLS[id] then ore = i end
+    end
+    return herb, ore, herbOn
+end
+
+-- UnitCastingInfo returns no values at all when not casting, and type() with no
+-- argument errors: the extra parentheses make it exactly one value (nil). The
+-- values may be secret on Forever, so presence is tested with type(), never by
+-- truthiness.
+local function SwapTracking()
+    if InCombatLockdown() or UnitIsDeadOrGhost("player") or UnitOnTaxi("player")
+        or type((UnitCastingInfo("player"))) ~= "nil" or type((UnitChannelInfo("player"))) ~= "nil" then
+        return
+    end
+    local herb, ore, herbOn = TrackingIndexes()
+    if not (herb and ore) then return end   -- needs both Herbalism and Mining
+    C_Minimap.SetTracking(herbOn and ore or herb, true)
+end
+
+local function ApplySwap(restart)
+    local on = farming and db.swapTracking
+    if swapTicker and (restart or not on) then
+        swapTicker:Cancel()
+        swapTicker = nil
+    end
+    if on and not swapTicker then
+        swapTicker = C_Timer.NewTicker(db.swapInterval, SwapTracking)
+    end
+end
+
+---- On and off (the mechanics; Reconcile decides when)
+
+local function FarmOn()
     TakeSnapshot()
     farming = true
     ApplyLook()
     Place()
+    ApplyRotate()
     if db.draggable then EnableDrag() end
     if db.hideButtons then HideButtons() end
-    if not quiet then
-        Print("On." .. (db.draggable and " Drag the map to move it." or ""))
-    end
+    ApplyMouse()
+    ApplyCoords()
+    ApplySwap()
 end
 
-local function FarmOff(quiet)
-    if not farming then return end
+local function FarmOff()
     DisableDrag()
     ShowButtons()
     RestoreLook()
     RestorePosition()
     farming = false
-    if not quiet then Print("Off.") end
+    ApplyMouse()
+    ApplyRotate()   -- after farming=false, so Blizzard's own look comes back untouched
+    ApplyCoords()
+    ApplySwap()
+end
+
+-- Why farm mode should not show right now, or nil
+local function Blocked()
+    if inCombat and db.combatMode == "CLOSE" then return "combat" end
+    if forced then return nil end
+    if db.offInstance and IsInInstance() then return "instance" end
+    if db.offResting and IsResting() then return "resting" end
+    return nil
+end
+
+local function Reconcile()
+    local show = wanted and not Blocked()
+    if show == farming then return end
+    -- Only the moment before lockdown (PLAYER_REGEN_DISABLED) is known to be
+    -- safe for moving the minimap; anything else waits for combat to end.
+    if InCombatLockdown() then return end
+    if show then FarmOn() else FarmOff() end
 end
 
 function ns.IsFarming() return farming end
 
--- Apply changed settings while farm mode is on.
+-- Apply changed settings
 function ns.Refresh()
+    Reconcile()
     if not farming then return end
     ApplyLook()
     Place()
+    ApplyRotate()
     if db.draggable then EnableDrag() else DisableDrag() end
     if db.hideButtons then HideButtons() else ShowButtons() end
+    ApplyMouse()
+    ApplyCoords()
+    ApplySwap(true)
 end
 
--- A toggle during combat waits for it to end: farm mode closes for combat by
--- default, and only the moment before lockdown (PLAYER_REGEN_DISABLED) is
--- known to be safe for moving the minimap.
 function ns.Toggle()
     if InCombatLockdown() then
-        local now = wantAfterCombat
-        if now == nil then now = farming or (closedByCombat and db.combatReopen) end
-        wantAfterCombat = not now
-        Print(wantAfterCombat and "Will switch on when combat ends." or "Will stay off after combat.")
+        -- Nothing moves until combat ends, so flip the intent: a second press
+        -- cancels the first.
+        wanted = not wanted
+        if wanted then forced = true end
+        if wanted == farming then
+            Print(wanted and "On." or "Off.")
+        else
+            Print(wanted and "Will switch on when combat ends." or "Will switch off when combat ends.")
+        end
         return
     end
-    if farming then FarmOff() else FarmOn() end
+    if farming then
+        wanted = false
+    else
+        wanted, forced = true, true     -- by hand: show it even in a city or dungeon
+    end
+    Reconcile()
+    if farming then
+        Print("On." .. (db.clickThrough and " Hold Alt to drag or click the map." or ""))
+    else
+        Print("Off.")
+    end
 end
 
 function FarmModeForever_Toggle()
@@ -371,18 +566,31 @@ end
 ---- Events
 
 local frame = CreateFrame("Frame")
-frame:RegisterEvent("ADDON_LOADED")
-frame:RegisterEvent("PLAYER_LOGIN")
-frame:RegisterEvent("PLAYER_REGEN_DISABLED")
-frame:RegisterEvent("PLAYER_REGEN_ENABLED")
+for _, e in ipairs({ "ADDON_LOADED", "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "PLAYER_LOGOUT",
+                     "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "MODIFIER_STATE_CHANGED",
+                     "PLAYER_MOUNT_DISPLAY_CHANGED", "PLAYER_UPDATE_RESTING", "ZONE_CHANGED_NEW_AREA" }) do
+    frame:RegisterEvent(e)
+end
 
-frame:SetScript("OnEvent", function(self, event, arg1)
+-- Moving into or out of a city or dungeon ends a by-hand override.
+local function PlaceChanged()
+    local key = tostring(IsInInstance() and true) .. "|" .. tostring(IsResting() and true)
+    if key ~= lastPlace then
+        lastPlace = key
+        forced = false
+        Reconcile()
+    end
+end
+
+frame:SetScript("OnEvent", function(self, event, arg1, arg2)
     if event == "ADDON_LOADED" then
         if arg1 ~= addonName then return end
         self:UnregisterEvent("ADDON_LOADED")
         InitDB()
         ns.version = C_AddOns.GetAddOnMetadata(addonName, "Version") or "?"
+        wanted = db.remember and db.wanted or false
         ns.CreateOptions()
+
     elseif event == "PLAYER_LOGIN" then
         -- Blizzard re-applies its minimap look when "rotate minimap" changes.
         if MinimapCluster and MinimapCluster.UpdateMinimapConfig then
@@ -400,20 +608,58 @@ frame:SetScript("OnEvent", function(self, event, arg1)
                 map.ZoomOut:Hide()
             end
         end)
+        wasMounted = IsMounted()
         if C_AddOns.IsAddOnLoaded("FarmMode") then
             Print("the classic FarmMode is also enabled. Both use /farm and move the minimap: disable one of them.")
         end
+
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        local isLogin, isReload = arg1, arg2
+        if isLogin or isReload then
+            -- Let Blizzard finish laying out the minimap before snapshotting it.
+            C_Timer.After(1, function()
+                lastPlace = nil
+                PlaceChanged()
+            end)
+        else
+            PlaceChanged()
+        end
+
+    elseif event == "ZONE_CHANGED_NEW_AREA" or event == "PLAYER_UPDATE_RESTING" then
+        PlaceChanged()
+
+    elseif event == "PLAYER_LOGOUT" then
+        db.wanted = wanted
+        if savedRotate then SetCVar("rotateMinimap", savedRotate) end
+
     elseif event == "PLAYER_REGEN_DISABLED" then
         -- Fires just before combat lockdown, so the minimap can still move.
-        if farming and db.combatClose then
-            FarmOff(true)
-            closedByCombat = true
+        inCombat = true
+        if farming and db.combatMode == "CLOSE" and not db.combatReopen then wanted = false end
+        if farming and db.combatMode == "FADE" then
+            faded = true
+            Minimap:SetAlpha(MapAlpha())
         end
+        Reconcile()
+
     elseif event == "PLAYER_REGEN_ENABLED" then
-        local want, asked = wantAfterCombat, wantAfterCombat ~= nil
-        if want == nil and closedByCombat then want = db.combatReopen end
-        wantAfterCombat, closedByCombat = nil, false
-        if want == true then FarmOn(not asked) elseif want == false then FarmOff(not asked) end
+        inCombat = false
+        if faded then
+            faded = false
+            if farming then Minimap:SetAlpha(MapAlpha()) end
+        end
+        Reconcile()
+
+    elseif event == "MODIFIER_STATE_CHANGED" then
+        if farming and db.clickThrough then ApplyMouse() end
+
+    elseif event == "PLAYER_MOUNT_DISPLAY_CHANGED" then
+        local mounted = IsMounted()
+        if db.autoMount and mounted and not wasMounted and not wanted then
+            wanted = true
+            Reconcile()
+        end
+        wasMounted = mounted
     end
 end)
 
