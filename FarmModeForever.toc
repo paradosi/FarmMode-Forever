@@ -1,0 +1,12 @@
+## Interface: 16001
+## Title: |cff00b3ffFarmMode|r Forever
+## Notes: Centres and enlarges the minimap for gathering routes: round or square, any size, any opacity. /farm
+## Author: paradosi-Dreamscythe
+## Version: 0.1.0
+## Category-enUS: Map & Minimap
+## IconTexture: Interface\AddOns\FarmModeForever\media\textures\logo
+## SavedVariables: FarmModeForeverDB
+## AddonCompartmentFunc: FarmModeForever_OnCompartmentClick
+
+Core.lua
+Options.lua
