@@ -2,7 +2,7 @@
 ## Title: |cff00b3ffFarmMode|r Forever
 ## Notes: Centres and enlarges the minimap for gathering routes: round or square, any size, any opacity. /farm
 ## Author: paradosi-Dreamscythe
-## Version: 0.1.0
+## Version: 1.0.0
 ## X-Website: https://github.com/paradosi/FarmMode-Forever
 ## X-Curse-Project-ID: 1834614
 ## X-Wago-ID: 56nbM569

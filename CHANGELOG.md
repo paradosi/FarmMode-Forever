@@ -1,10 +1,7 @@
 # Changelog
 
-## Unreleased
-- The settings window has a **Help and bug reports** button with the GitHub address to copy, and `/farm help` prints the version and the address
-
-## v0.1.0
-- First version: FarmMode rebuilt for WoW Forever
+## v1.0.0
+- First release: FarmMode rebuilt for WoW Forever
 - The minimap is resized rather than scaled, so it shows more ground while node and quest icons stay their normal size
 - Round or square shape, with or without a border
 - Size, zoom, opacity and position, all applied live while farm mode is on
@@ -17,3 +14,4 @@
 - Hiding minimap buttons also hides other addons' minimap buttons
 - Addon compartment entry: left-click toggles, right-click opens the options
 - Settings window in the wowdb.dev look (navy, gold, Oswald and JetBrains Mono), matching Forever Alts and Nightclaw Ears
+- The settings window shows the version and has a **Help and bug reports** button with the GitHub address to copy; `/farm help` prints both
