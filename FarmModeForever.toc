@@ -13,5 +13,6 @@
 
 Theme.lua
 Widgets.lua
+MinimapButton.lua
 Core.lua
 Options.lua

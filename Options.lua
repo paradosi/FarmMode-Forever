@@ -385,7 +385,14 @@ function ns.CreateOptions()
     local rotate = MakeCheck(coords, -6, "Rotate the map as you turn")
     rotate.onChange = Set("rotate")
 
-    local combatSec = Section(rotate, -18, "In combat")
+    local mini = MakeCheck(rotate, -6, "Show the minimap button")
+    mini.onChange = function(v)
+        db.minimap = v
+        if ns.minimapButton then ns.minimapButton:Update() end
+    end
+    local miniNote = Note(mini, -4, "left: farm mode  ·  right: this  ·  drag: move it")
+
+    local combatSec = Section(miniNote, -18, "In combat")
     local reopen, combatAlpha
     local function CombatLooks(mode)
         reopen:SetEnabledLook(mode == "CLOSE")
@@ -453,6 +460,7 @@ function ns.CreateOptions()
         buttons:SetChecked(db.hideButtons)
         coords:SetChecked(db.coords)
         rotate:SetChecked(db.rotate)
+        mini:SetChecked(db.minimap)
         combat:Set(db.combatMode)
         reopen:SetChecked(db.combatReopen)
         combatAlpha:SetValue(db.combatOpacity)

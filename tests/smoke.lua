@@ -102,6 +102,8 @@ function CreateFrame(kind, name, parent)
 end
 UIParent = NewWidget("Frame", "UIParent")
 Minimap = NewWidget("Minimap", "Minimap")
+Minimap.GetCenter = function() return 500, 400 end  -- our minimap button drags around it
+GameTooltip = NewWidget("GameTooltip", "GameTooltip")
 Minimap.w, Minimap.h, Minimap.mask = 198, 198, "ui-hud-minimap-frame-generic-mask"
 Minimap.points = { { "CENTER", "MinimapContainer", "CENTER", 0, 0 } }
 Minimap.ZoomIn = NewWidget("Button"); Minimap.ZoomIn.shown = false
@@ -366,6 +368,29 @@ state.casting = false
 Fire("PLAYER_LOGOUT")
 check(FarmModeForeverDB.wanted == true, "logout saves that farm mode was on")
 check(state.cvars.rotateMinimap == "0", "logout leaves rotate as it was")
+
+-- our own minimap button (MinimapButton.lua)
+local mb = FarmModeForeverMinimapButton
+check(mb and mb.shown, "minimap button: there and shown")
+local miniTick
+for _, f in ipairs(frames) do
+    if f.label and f.label.text == "Show the minimap button" then miniTick = f end
+end
+check(miniTick and miniTick.checked == true, "minimap button: the settings tick is on")
+SlashCmdList.FARMMODEFOREVER("minimap")
+check(not mb.shown and ns.db.minimap == false, "minimap button: /farm minimap hides it")
+check(miniTick.checked == false, "minimap button: the tick follows /farm minimap")
+miniTick.scripts.OnClick(miniTick)
+check(mb.shown and ns.db.minimap == true, "minimap button: the tick shows it again")
+mb.scripts.OnDragStart(mb); mb.scripts.OnUpdate(mb); mb.scripts.OnDragStop(mb)
+check(type(ns.db.minimapAngle) == "number" and ns.db.minimapAngle ~= 140, "minimap button: dragging saves its place")
+if ns.IsFarming() then SlashCmdList.FARMMODEFOREVER("") end
+ns.db.hideButtons = true
+SlashCmdList.FARMMODEFOREVER("")
+check(ns.IsFarming() and not mb.shown, "minimap button: hidden with the others while farming")
+SlashCmdList.FARMMODEFOREVER("")
+check(mb.shown, "minimap button: back when farm mode ends")
+ns.db.hideButtons = false
 
 -- reset defaults through the panel's own path
 for k, v in pairs(ns.defaults) do ns.db[k] = v end

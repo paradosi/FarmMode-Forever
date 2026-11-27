@@ -72,6 +72,9 @@ ns.defaults = {
     -- tracking
     swapTracking = false,   -- alternate Find Herbs and Find Minerals
     swapInterval = 5,       -- seconds
+    -- our own minimap button (MinimapButton.lua)
+    minimap = true,         -- shown
+    minimapAngle = 140,     -- degrees around the edge; dragging saves it
 }
 
 local db
@@ -201,6 +204,13 @@ local function MapAlpha()
     return (faded and db.combatOpacity or db.opacity) / 100
 end
 
+-- Our own minimap button rides the edge of the minimap, so it is re-placed
+-- whenever the map changes size; skipped while HideButtons has it hidden.
+local function PlaceMinimapButton()
+    local mb = ns.minimapButton
+    if mb and not hidden[mb] then mb:Update() end
+end
+
 local function ApplyLook()
     applying = true
     local k = db.size / snapshot.width
@@ -229,6 +239,7 @@ local function ApplyLook()
     Minimap:SetAlpha(MapAlpha())
     SetZoom(db.zoom)
     applying = false
+    PlaceMinimapButton()
 end
 
 local function RestoreLook()
@@ -248,6 +259,7 @@ local function RestoreLook()
     Minimap:SetAlpha(snapshot.alpha)
     SetZoom(snapshot.zoom)
     applying = false
+    PlaceMinimapButton()
 end
 
 -- Rotate Minimap is a CVar Blizzard's look follows (the hook above re-applies
@@ -378,6 +390,7 @@ local function HideButtons()
         local name = child:GetName()
         if name and name:find("^LibDBIcon10_") then HideOne(child) end
     end
+    HideOne(ns.minimapButton)
     Minimap.ZoomIn:Hide()
     Minimap.ZoomOut:Hide()
 end
@@ -593,6 +606,16 @@ frame:SetScript("OnEvent", function(self, event, arg1, arg2)
         ns.CreateOptions()
 
     elseif event == "PLAYER_LOGIN" then
+        ns.minimapButton = ns.MinimapButton({
+            name = "FarmModeForeverMinimapButton",
+            icon = "Interface\\AddOns\\FarmModeForever\\media\\textures\\logo",
+            title = "FarmMode Forever",
+            lines = { "Left-click: farm mode on or off", "Right-click: settings" },
+            db = db,
+            onClick = function(button)
+                if button == "RightButton" then ns.OpenOptions() else ns.Toggle() end
+            end,
+        })
         -- Blizzard re-applies its minimap look when "rotate minimap" changes.
         if MinimapCluster and MinimapCluster.UpdateMinimapConfig then
             hooksecurefunc(MinimapCluster, "UpdateMinimapConfig", function()
@@ -676,9 +699,14 @@ SlashCmdList.FARMMODEFOREVER = function(msg)
         ns.Refresh()
         if ns.OnSettingsChanged then ns.OnSettingsChanged() end
         Print("Shape: " .. msg .. ".")
+    elseif msg == "minimap" then
+        db.minimap = not db.minimap
+        if ns.minimapButton then ns.minimapButton:Update() end
+        if ns.OnSettingsChanged then ns.OnSettingsChanged() end
+        Print("Minimap button " .. (db.minimap and "shown" or "hidden") .. ".")
     elseif msg == "help" then
         Print("version " .. (ns.version or "?") .. (ns.website and ("  ·  help and bug reports: " .. ns.website) or ""))
-        Print("/farm toggles farm mode. /farm config opens the options. /farm square, /farm round change the shape.")
+        Print("/farm toggles farm mode. /farm config opens the options. /farm square, /farm round change the shape. /farm minimap shows or hides the minimap button.")
     else
         ns.Toggle()
     end

@@ -49,9 +49,11 @@ Install from [CurseForge](https://www.curseforge.com/projects/1834614) or [Wago]
 | `/farm` | Toggle farm mode |
 | `/farm config` | Open the options (also `options`, `settings`) |
 | `/farm square`, `/farm round` | Change the shape |
+| `/farm minimap` | Show or hide the minimap button |
 | `/farm help` | The version, the GitHub link and the commands |
 
 - **Key binding**: *Esc → Options → Keybindings → AddOns → FarmMode Forever → Toggle Farm Mode*.
+- **Minimap button**: left-click toggles, right-click opens the options, drag it around the minimap's edge. *Show the minimap button* in the options (or `/farm minimap`) hides it.
 - **Addon compartment** (the button by the minimap): left-click toggles, right-click opens the options.
 - **Help and bug reports**: the settings window shows the installed version, and its *Help and bug reports* button gives you this page's address to copy (addons can't open a browser).
 
@@ -79,6 +81,7 @@ All settings are per account (`FarmModeForeverDB`) and take effect immediately w
 | Clicks go through (hold Alt to use it) | on | | While farming, the map takes the mouse only with Alt held |
 | Show coordinates | on | | Under the map. Blank in instances, which have no map position |
 | Rotate the map as you turn | off | | Turns on Blizzard's *Rotate Minimap* while farming, puts it back after (and at logout) |
+| Show the minimap button | on | | FarmMode Forever's own button on the minimap's edge. Dragging it saves its place |
 | In combat | Close | Close, Fade, Stay | |
 | Open it again when combat ends | on | | *Close* only |
 | Opacity in combat | 20% | 0–80% | *Fade* only |
@@ -157,6 +160,7 @@ cd FarmMode-Forever && lua5.1 tests/smoke.lua   # headless run against a stubbed
 | `tests/smoke.lua` | Headless test (not shipped) |
 | `Theme.lua` | wowdb.dev's look (colours, fonts, borders, hover glow), copied from Forever Alts and trimmed |
 | `Options.lua` | The settings panel, built on `Theme.lua` |
+| `MinimapButton.lua` | The minimap button; shared byte-identical with ForeverAlts (its source) and the other Forever addons |
 | `Widgets.lua` | The copy dialog for the support link; shared byte-identical with ForeverQuestItemBar and the Flo addons |
 | `media/fonts/` | Oswald and JetBrains Mono (SIL OFL; the licence files ship with them) |
 | `Bindings.xml` | The key binding (loaded by the client, not listed in the TOC) |

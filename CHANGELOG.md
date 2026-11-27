@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- **Minimap button**: left-click switches farm mode on or off, right-click opens the settings, drag it around the edge. Turn it off with *Show the minimap button* in the settings or `/farm minimap`. With *Hide minimap buttons* on, it hides with the others while farming
+
 ## v1.0.0
 - First release: FarmMode rebuilt for WoW Forever
 - The minimap is resized rather than scaled, so it shows more ground while node and quest icons stay their normal size
