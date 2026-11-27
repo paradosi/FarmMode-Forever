@@ -239,6 +239,8 @@ registered:Show()
 check(true, "settings panel OnShow runs")
 
 -- on, default look
+-- Polestar draws its own minimap coordinates; farm mode must not draw on top of them
+CreateFrame("Frame", "PolestarMinimapCoords", Minimap)
 SlashCmdList.FARMMODEFOREVER("")
 check(ns.IsFarming(), "/farm turns it on")
 check(Minimap.w == 400, "resized to 400")
@@ -254,12 +256,16 @@ Tick()
 local coordText
 for _, f in ipairs(Minimap.children) do if f.text and f.text.text then coordText = f.text.text end end
 check(coordText == "41.2, 67.9", "coordinates shown (" .. tostring(coordText) .. ")")
+check(not PolestarMinimapCoords.shown, "Polestar's minimap coordinates hidden while ours show (no double text)")
+PolestarMinimapCoords:Show()
+check(not PolestarMinimapCoords.shown, "and kept hidden if Polestar shows them again")
 
 -- square, then off: everything back
 SlashCmdList.FARMMODEFOREVER("square")
 check(Minimap.mask == "Interface\\Buttons\\WHITE8X8", "square mask")
 check(not MinimapCompassTexture.shown, "round border hidden when square")
 SlashCmdList.FARMMODEFOREVER("")
+check(PolestarMinimapCoords.shown, "Polestar's minimap coordinates come back when farm mode ends")
 check(not ns.IsFarming(), "/farm turns it off")
 check(Minimap.w == 198 and Minimap.h == 198, "size restored")
 check(Minimap.mask == "ui-hud-minimap-frame-generic-mask", "round mask restored")

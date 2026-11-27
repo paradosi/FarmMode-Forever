@@ -19,6 +19,7 @@ Press `/farm` (or a key) and the minimap grows into a large, see-through map whe
 - **Coordinates** under the map.
 - **Rotate the map as you turn** while farming, put back as it was afterwards.
 - **Alternate herb and ore tracking** for herbalist-miners, every few seconds; it waits while you cast, fight, fly or are dead.
+- **Minimap button**: left-click for farm mode, right-click for settings, drag to move it. It can be turned off.
 - **Hides the clutter**: zone text, tracking, calendar and other addons' minimap buttons while farming.
 - **Settings window** in a navy-and-gold look: `/farm config`, or right-click the addon compartment entry.
 

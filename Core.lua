@@ -417,6 +417,37 @@ local function UpdateCoords()
     text:SetFormattedText("%.1f, %.1f", x * 100, y * 100)
 end
 
+-- Other addons' minimap coordinates (Polestar's "minimap coordinates") sit on
+-- the same map, and once farm mode resizes it they land on top of ours: drawn
+-- twice (jim, 2026-11-27). While ours show, theirs are hidden, and kept hidden
+-- if their addon shows them again; they come back when ours go.
+local OTHER_COORDS = { "PolestarMinimapCoords" }
+local othersHidden = {}
+
+local function HideOtherCoords(on)
+    for _, name in ipairs(OTHER_COORDS) do
+        local f = _G[name]
+        if f then
+            if on and f:IsShown() then
+                othersHidden[f] = true
+                f:Hide()
+            elseif not on and othersHidden[f] then
+                othersHidden[f] = nil
+                f:Show()
+            end
+            if not f.farmModeHooked then
+                f.farmModeHooked = true
+                f:HookScript("OnShow", function(self)
+                    if coordFrame and coordFrame:IsShown() then
+                        othersHidden[self] = true
+                        self:Hide()
+                    end
+                end)
+            end
+        end
+    end
+end
+
 local function ApplyCoords()
     local on = farming and db.coords
     if on and not coordFrame then
@@ -430,6 +461,7 @@ local function ApplyCoords()
         coordFrame.text:SetPoint("CENTER")
     end
     if coordFrame then coordFrame:SetShown(on) end
+    HideOtherCoords(on)
     if on and not coordTicker then
         UpdateCoords()
         coordTicker = C_Timer.NewTicker(0.2, UpdateCoords)

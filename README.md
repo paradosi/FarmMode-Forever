@@ -138,6 +138,7 @@ Combat uses `PLAYER_REGEN_DISABLED`, which fires just before combat lockdown sta
 | Tracking doesn't alternate | You need both Herbalism and Mining. It also waits while you cast, fight, ride a taxi or are dead. If it never switches, Forever may not allow it from an addon: please report it |
 | The map is off screen | `/farm config` → **Reset Defaults**, or drag it back |
 | The map looks blank or stale after a change | Zoom in and out once with the mouse wheel. Farm mode does this itself, but report it if it happens |
+| Coordinates drawn twice | Fixed for Polestar's minimap coordinates, which farm mode hides while it shows its own. Another addon's: turn its minimap coordinates off, or untick *Show coordinates* |
 | Another addon's minimap button stays visible | Only LibDBIcon buttons (named `LibDBIcon10_*`) are recognised |
 | The minimap is in the wrong place after farm mode | `/reload`. Please report what you did, since farm mode is meant to restore it exactly |
 
