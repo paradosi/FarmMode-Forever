@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.1.0
 - **Minimap button**: left-click switches farm mode on or off, right-click opens the settings, drag it around the edge. Turn it off with *Show the minimap button* in the settings or `/farm minimap`. With *Hide minimap buttons* on, it hides with the others while farming
 - Coordinates are no longer drawn twice with Polestar's minimap coordinates on: farm mode hides Polestar's while it shows its own, and gives them back after
 
