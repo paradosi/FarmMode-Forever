@@ -4,6 +4,8 @@
 ## Author: paradosi-Dreamscythe
 ## Version: 0.1.0
 ## X-Website: https://github.com/paradosi/FarmMode-Forever
+## X-Curse-Project-ID: 1834614
+## X-Wago-ID: 56nbM569
 ## Category-enUS: Map & Minimap
 ## IconTexture: Interface\AddOns\FarmModeForever\media\textures\logo
 ## SavedVariables: FarmModeForeverDB

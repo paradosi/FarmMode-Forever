@@ -40,7 +40,7 @@ It is a rewrite of [FarmMode](https://github.com/paradosi/FarmMode) for Forever'
 
 ## Installation
 
-Copy the `FarmModeForever` folder into `World of Warcraft\_forever_\Interface\AddOns\` and `/reload` (or restart the game).
+Install from [CurseForge](https://www.curseforge.com/projects/1834614) or [Wago](https://addons.wago.io/addons/56nbM569) with your addon manager, or copy the `FarmModeForever` folder into `World of Warcraft\_forever_\Interface\AddOns\` and `/reload` (or restart the game).
 
 ## Usage
 
