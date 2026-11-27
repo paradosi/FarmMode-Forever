@@ -22,6 +22,8 @@ Press `/farm` (or a key) and the minimap grows into a large, see-through map whe
 - **Hides the clutter**: zone text, tracking, calendar and other addons' minimap buttons while farming.
 - **Settings window** in a navy-and-gold look: `/farm config`, or right-click the addon compartment entry.
 
+![The settings window](https://raw.githubusercontent.com/paradosi/FarmMode-Forever/main/media/screenshots/settings.jpg)
+
 ## Slash commands
 
 | Command | Does |

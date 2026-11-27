@@ -26,6 +26,10 @@ It is a rewrite of [FarmMode](https://github.com/paradosi/FarmMode) for Forever'
 - **Hides the clutter.** Optionally hides the zone text, tracking, calendar, addon compartment, Blizzard's event button and other addons' minimap buttons while farming. Only what farm mode hid is shown again.
 - **Exact restore.** Turning farm mode off puts back the minimap's anchors, size, border art, mask, opacity and zoom.
 
+## Screenshots
+
+<img src="https://raw.githubusercontent.com/paradosi/FarmMode-Forever/main/media/screenshots/settings.jpg" width="600" alt="The FarmMode Forever settings window">
+
 ## Requirements
 
 | | |
