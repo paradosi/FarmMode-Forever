@@ -3,11 +3,13 @@
 ## Notes: Centres and enlarges the minimap for gathering routes: round or square, any size, any opacity. /farm
 ## Author: paradosi-Dreamscythe
 ## Version: 0.1.0
+## X-Website: https://github.com/paradosi/FarmMode-Forever
 ## Category-enUS: Map & Minimap
 ## IconTexture: Interface\AddOns\FarmModeForever\media\textures\logo
 ## SavedVariables: FarmModeForeverDB
 ## AddonCompartmentFunc: FarmModeForever_OnCompartmentClick
 
 Theme.lua
+Widgets.lua
 Core.lua
 Options.lua

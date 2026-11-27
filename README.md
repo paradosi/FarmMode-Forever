@@ -6,8 +6,9 @@ Turns the minimap into a big gathering map in the middle of your screen, and put
 
 It is a rewrite of [FarmMode](https://github.com/paradosi/FarmMode) for Forever's Retail-engine minimap, with a square shape, a real resize and combat handling added.
 
-> [!NOTE]
-> Version 0.1.0 has not been run in game yet. If the minimap ends up somewhere odd, `/reload` puts Blizzard's minimap back.
+> [!TIP]
+> If the minimap ever ends up somewhere odd, `/reload` puts Blizzard's minimap back. Please
+> [report it](https://github.com/paradosi/FarmMode-Forever/issues) with what you did.
 
 ## Features
 
@@ -44,10 +45,11 @@ Copy the `FarmModeForever` folder into `World of Warcraft\_forever_\Interface\Ad
 | `/farm` | Toggle farm mode |
 | `/farm config` | Open the options (also `options`, `settings`) |
 | `/farm square`, `/farm round` | Change the shape |
-| `/farm help` | List the commands |
+| `/farm help` | The version, the GitHub link and the commands |
 
 - **Key binding**: *Esc → Options → Keybindings → AddOns → FarmMode Forever → Toggle Farm Mode*.
 - **Addon compartment** (the button by the minimap): left-click toggles, right-click opens the options.
+- **Help and bug reports**: the settings window shows the installed version, and its *Help and bug reports* button gives you this page's address to copy (addons can't open a browser).
 
 ### Examples
 
@@ -151,6 +153,7 @@ cd FarmMode-Forever && lua5.1 tests/smoke.lua   # headless run against a stubbed
 | `tests/smoke.lua` | Headless test (not shipped) |
 | `Theme.lua` | wowdb.dev's look (colours, fonts, borders, hover glow), copied from Forever Alts and trimmed |
 | `Options.lua` | The settings panel, built on `Theme.lua` |
+| `Widgets.lua` | The copy dialog for the support link; shared byte-identical with ForeverQuestItemBar and the Flo addons |
 | `media/fonts/` | Oswald and JetBrains Mono (SIL OFL; the licence files ship with them) |
 | `Bindings.xml` | The key binding (loaded by the client, not listed in the TOC) |
 | `media/textures/logo.tga` | Icon, shipped |

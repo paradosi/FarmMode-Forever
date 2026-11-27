@@ -588,6 +588,7 @@ frame:SetScript("OnEvent", function(self, event, arg1, arg2)
         self:UnregisterEvent("ADDON_LOADED")
         InitDB()
         ns.version = C_AddOns.GetAddOnMetadata(addonName, "Version") or "?"
+        ns.website = C_AddOns.GetAddOnMetadata(addonName, "X-Website")
         wanted = db.remember and db.wanted or false
         ns.CreateOptions()
 
@@ -676,6 +677,7 @@ SlashCmdList.FARMMODEFOREVER = function(msg)
         if ns.OnSettingsChanged then ns.OnSettingsChanged() end
         Print("Shape: " .. msg .. ".")
     elseif msg == "help" then
+        Print("version " .. (ns.version or "?") .. (ns.website and ("  ·  help and bug reports: " .. ns.website) or ""))
         Print("/farm toggles farm mode. /farm config opens the options. /farm square, /farm round change the shape.")
     else
         ns.Toggle()

@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- The settings window has a **Help and bug reports** button with the GitHub address to copy, and `/farm help` prints the version and the address
+
 ## v0.1.0
 - First version: FarmMode rebuilt for WoW Forever
 - The minimap is resized rather than scaled, so it shows more ground while node and quest icons stay their normal size

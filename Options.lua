@@ -423,8 +423,17 @@ function ns.CreateOptions()
     local reset = MakeButton("Reset defaults", 130)
     reset:SetPoint("TOPLEFT", foot, "BOTTOMLEFT", 0, -12)
 
+    -- Addons can't open a browser: the link opens selected, for Ctrl+C
+    -- (W.CopyDialog, from the shared Widgets.lua)
+    local help = MakeButton("Help and bug reports", 180)
+    help:SetPoint("LEFT", reset, "RIGHT", 10, 0)
+    help:SetScript("OnClick", function()
+        if ns.website then ns.W.CopyDialog("Help and bug reports", ns.website) end
+    end)
+    help:SetShown(ns.website ~= nil)
+
     local hint = T.Text(host, T.mono, 10, C.muted)
-    hint:SetPoint("LEFT", reset, "RIGHT", 16, 0)
+    hint:SetPoint("TOPLEFT", reset, "BOTTOMLEFT", 0, -10)
     hint:SetText("/farm toggles  ·  right-click the addon menu entry for this")
 
     local function Sync()
@@ -455,7 +464,7 @@ function ns.CreateOptions()
     panel:SetScript("OnShow", function()
         Sync()
         -- Size the scroll area to what is actually there (fonts are loaded by now).
-        local top, bottom = host:GetTop(), reset:GetBottom()
+        local top, bottom = host:GetTop(), hint:GetBottom()
         if top and bottom then host:SetHeight(top - bottom + 20) end
         UpdateBar()
     end)
